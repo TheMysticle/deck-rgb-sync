@@ -7,7 +7,7 @@ export function ModeSettings() {
     if (!loaded) return null;
 
     const options = [
-        { data: "auto", label: "Auto (RAM & Download)" },
+        { data: "auto", label: "Auto (Download / Solid)" },
         { data: "solid", label: "Solid Color" },
     ];
 

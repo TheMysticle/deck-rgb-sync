@@ -18,14 +18,15 @@ class RGBController:
             pass
             
         try:
-            self.client = OpenRGBClient(self.host, self.port, "deck-rgb-sync")
+            # Force protocol version 3 to avoid handshake failures on some OpenRGB builds
+            self.client = OpenRGBClient(self.host, self.port, "deck-rgb-sync", protocol_version=3)
             self.client.update()
             self.connected = True
             decky.logger.info(f"Connected to OpenRGB at {self.host}:{self.port}")
         except Exception as e:
             self.client = None
             self.connected = False
-            decky.logger.debug(f"Failed to connect to OpenRGB: {e}")
+            decky.logger.info(f"Failed to connect to OpenRGB at {self.host}:{self.port}: {e}")
 
     def disconnect(self):
         if self.client:
@@ -38,11 +39,15 @@ class RGBController:
 
     def get_devices(self):
         if not self.connected or not self.client:
+            decky.logger.info("get_devices called but not connected!")
             return []
         
         try:
+            self.client.update()
             devices = []
+            decky.logger.info(f"OpenRGB found {len(self.client.devices)} devices.")
             for d in self.client.devices:
+                decky.logger.info(f"Device: {d.name}")
                 device_info = {
                     "id": d.id,
                     "name": d.name,
@@ -80,48 +85,45 @@ class RGBController:
             return RGBColor(r, g, b)
         return RGBColor(0, 0, 0)
 
-    def set_solid_color(self, device_id: int, zone_id: int, hex_color: str):
+    def set_solid_color(self, enabled_devices: list, hex_color: str):
         if not self.connected or not self.client:
             return
             
         try:
-            if device_id < len(self.client.devices):
-                device = self.client.devices[device_id]
-                if zone_id < len(device.zones):
-                    zone = device.zones[zone_id]
-                    color = self.hex_to_rgb(hex_color)
-                    colors = [color] * len(zone.leds)
-                    zone.set_colors(colors, fast=True)
+            color = self.hex_to_rgb(hex_color)
+            for device in self.client.devices:
+                if device.name in enabled_devices:
+                    for zone in device.zones:
+                        colors = [color] * len(zone.leds)
+                        zone.set_colors(colors, fast=True)
         except Exception as e:
             decky.logger.error(f"Error setting solid color: {e}")
             self.connected = False
 
-    def set_zone_fill(self, device_id: int, zone_id: int, percent: float, fill_hex: str, bg_hex: str = "#000000"):
+    def set_zone_fill(self, enabled_devices: list, percent: float, fill_hex: str, bg_hex: str = "#000000"):
         if not self.connected or not self.client:
             return
             
         try:
-            if device_id < len(self.client.devices):
-                device = self.client.devices[device_id]
-                if zone_id < len(device.zones):
-                    zone = device.zones[zone_id]
-                    num_leds = len(zone.leds)
-                    if num_leds == 0:
-                        return
-                    
-                    fill_count = int(num_leds * percent)
-                    
-                    fill_color = self.hex_to_rgb(fill_hex)
-                    bg_color = self.hex_to_rgb(bg_hex)
-                    
-                    colors = []
-                    for i in range(num_leds):
-                        if i < fill_count:
-                            colors.append(fill_color)
-                        else:
-                            colors.append(bg_color)
-                    
-                    zone.set_colors(colors, fast=True)
+            fill_color = self.hex_to_rgb(fill_hex)
+            bg_color = self.hex_to_rgb(bg_hex)
+
+            for device in self.client.devices:
+                if device.name in enabled_devices:
+                    for zone in device.zones:
+                        num_leds = len(zone.leds)
+                        if num_leds == 0:
+                            continue
+                        
+                        fill_count = int(num_leds * percent)
+                        colors = []
+                        for i in range(num_leds):
+                            if i < fill_count:
+                                colors.append(fill_color)
+                            else:
+                                colors.append(bg_color)
+                        
+                        zone.set_colors(colors, fast=True)
         except Exception as e:
             decky.logger.error(f"Error setting zone fill: {e}")
             self.connected = False

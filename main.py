@@ -1,4 +1,10 @@
 import os
+import sys
+
+# Add the plugin directory to path so the backend module can be imported
+sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.join(os.path.dirname(__file__), "py_modules"))
+
 import decky
 import asyncio
 import logging
@@ -17,7 +23,10 @@ class Plugin:
     async def get_devices(self):
         return self.state_machine.rgb.get_devices()
 
-    async def push_download_progress(self, percent: float):
+    async def push_download_progress(self, percent: float, debug_payload: str = ""):
+        if debug_payload:
+            decky.logger.info(f"Steam Download Overview Payload: {debug_payload}")
+            
         if percent is None or percent < 0:
             self.state_machine.set_download_progress(None)
         else:
