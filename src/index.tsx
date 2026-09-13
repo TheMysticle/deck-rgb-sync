@@ -88,19 +88,28 @@ function SystemUpdateContent() {
 const pushDownloadProgress = callable<[state: string, percent: number | null, debug_payload: string], boolean>("push_download_progress");
 
 let downloadOverviewRegistration: any = null;
+let downloadItemsRegistration: any = null;
 let lastState = "IDLE";
 let lastPercent = 0.0;
 
 const startDownloadListener = () => {
     try {
         const downloadsApi = (SteamClient as any).Downloads;
+        
         if (downloadsApi && typeof downloadsApi.RegisterForDownloadOverview === 'function') {
             downloadOverviewRegistration = downloadsApi.RegisterForDownloadOverview((overview: any) => {
                 const debugPayload = JSON.stringify(overview);
                 
                 let active = null;
                 if (overview) {
-                    const percent = (overview.overall_percent_complete !== undefined) ? overview.overall_percent_complete / 100.0 : null;
+                    let percent = (overview.overall_percent_complete !== undefined) ? overview.overall_percent_complete / 100.0 : null;
+                    
+                    // Critical Fix: Steam drops network percentage to 0 when pausing or finishing drive installs.
+                    // If we already had progress, lock it so the LED bar doesn't disappear and the COMPLETE check doesn't fail!
+                    if (percent === 0 && lastPercent > 0.0) {
+                        percent = lastPercent;
+                    }
+                    
                     if (percent !== null) {
                         lastPercent = percent;
                     }
@@ -135,8 +144,11 @@ const startDownloadListener = () => {
                 }
                 
                 // Fallthrough
-                lastState = "IDLE";
-                pushDownloadProgress("IDLE", 0, debugPayload);
+                if (lastState !== "IDLE") {
+                    lastState = "IDLE";
+                    lastPercent = 0.0;
+                    pushDownloadProgress("IDLE", 0, debugPayload);
+                }
             });
         } else {
             pushDownloadProgress("IDLE", null, "RegisterForDownloadOverview is missing");

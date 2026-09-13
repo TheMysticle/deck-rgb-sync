@@ -25,7 +25,7 @@ class Plugin:
 
     async def push_download_progress(self, state: str, percent: float, debug_payload: str = ""):
         if debug_payload:
-            decky.logger.info(f"Steam Download State: {state}, Percent: {percent}")
+            decky.logger.info(f"Steam Download State: {state}, Percent: {percent}, Payload: {debug_payload}")
             
         self.state_machine.set_download_state(state, percent)
         return True

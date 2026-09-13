@@ -94,6 +94,8 @@ class RGBController:
             for device in self.client.devices:
                 if device.name in enabled_devices:
                     for zone in device.zones:
+                        if len(zone.leds) == 0:
+                            continue
                         colors = [color] * len(zone.leds)
                         zone.set_colors(colors, fast=True)
         except Exception as e:
