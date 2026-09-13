@@ -23,14 +23,11 @@ class Plugin:
     async def get_devices(self):
         return self.state_machine.rgb.get_devices()
 
-    async def push_download_progress(self, percent: float, debug_payload: str = ""):
+    async def push_download_progress(self, state: str, percent: float, debug_payload: str = ""):
         if debug_payload:
-            decky.logger.info(f"Steam Download Overview Payload: {debug_payload}")
+            decky.logger.info(f"Steam Download State: {state}, Percent: {percent}")
             
-        if percent is None or percent < 0:
-            self.state_machine.set_download_progress(None)
-        else:
-            self.state_machine.set_download_progress(percent)
+        self.state_machine.set_download_state(state, percent)
         return True
 
     async def _main(self):

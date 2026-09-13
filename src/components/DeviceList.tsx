@@ -7,7 +7,9 @@ const getDevices = callable<[], any[]>("get_devices");
 
 export function DeviceList() {
     const [devices, setDevices] = useState<any[]>([]);
-    const [enabledDevices, setEnabledDevices, loaded] = useSetting<string[]>("enabled_devices", []);
+    const [enabledDevices, setEnabledDevices, loadedEnabled] = useSetting<string[]>("enabled_devices", []);
+    const [deviceSettings, setDeviceSettings, loadedSettings] = useSetting<Record<string, any>>("device_settings", {});
+    const [expanded, setExpanded] = useState<string | null>(null);
     
     const fetchDevices = () => {
         getDevices().then(res => {
@@ -19,7 +21,7 @@ export function DeviceList() {
         fetchDevices();
     }, []);
 
-    if (!loaded) return null;
+    if (!loadedEnabled || !loadedSettings) return null;
 
     const toggleDevice = (deviceName: string, enabled: boolean) => {
         if (enabled) {
@@ -32,12 +34,31 @@ export function DeviceList() {
     return (
         <>
             {devices.map((device, index) => (
-                <ToggleField
-                    key={index}
-                    label={device.name}
-                    checked={enabledDevices.includes(device.name)}
-                    onChange={(val) => toggleDevice(device.name, val)}
-                />
+                <div key={index} style={{ marginBottom: "8px" }}>
+                    <ToggleField
+                        label={device.name}
+                        checked={enabledDevices.includes(device.name)}
+                        onChange={(val) => toggleDevice(device.name, val)}
+                    />
+                    {enabledDevices.includes(device.name) && (
+                        <ButtonItem 
+                            layout="below" 
+                            onClick={() => setExpanded(expanded === device.name ? null : device.name)}
+                        >
+                            {expanded === device.name ? "Hide Settings" : "Device Settings ⚙️"}
+                        </ButtonItem>
+                    )}
+                    {expanded === device.name && (
+                        <div style={{ marginLeft: "20px", marginTop: "8px", borderLeft: "2px solid #444", paddingLeft: "15px" }}>
+                            <ToggleField 
+                                label="Reverse LEDs" 
+                                description="Flips the animation direction"
+                                checked={deviceSettings[device.name]?.reverse || false}
+                                onChange={(val) => setDeviceSettings({...deviceSettings, [device.name]: {...(deviceSettings[device.name] || {}), reverse: val}})}
+                            />
+                        </div>
+                    )}
+                </div>
             ))}
             {devices.length === 0 && (
                 <div style={{ padding: "10px", color: "#888" }}>No devices found.</div>

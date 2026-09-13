@@ -12,6 +12,7 @@ import { ModeSettings } from "./components/ModeSettings";
 import { DeviceList } from "./components/DeviceList";
 import { ColorPicker } from "./components/ColorPicker";
 import { ConnectionSettings } from "./components/ConnectionSettings";
+import { AnimationPicker } from "./components/AnimationPicker";
 
 function Content() {
     return (
@@ -45,9 +46,50 @@ function ColorsContent() {
     );
 }
 
-const pushDownloadProgress = callable<[percent: number | null, debug_payload: string], boolean>("push_download_progress");
+function StatusContent() {
+    return (
+        <PanelSection title="Download Complete">
+            <PanelSectionRow>
+                <ColorPicker label="Color" settingKey="complete_color" defaultValue="#00ff00" />
+            </PanelSectionRow>
+            <PanelSectionRow>
+                <AnimationPicker label="Animation" settingKey="complete_anim" defaultAnim="Solid" />
+            </PanelSectionRow>
+        </PanelSection>
+    );
+}
+
+function ErrorContent() {
+    return (
+        <PanelSection title="Download Failed">
+            <PanelSectionRow>
+                <ColorPicker label="Color" settingKey="failed_color" defaultValue="#ff0000" />
+            </PanelSectionRow>
+            <PanelSectionRow>
+                <AnimationPicker label="Animation" settingKey="failed_anim" defaultAnim="Blink" />
+            </PanelSectionRow>
+        </PanelSection>
+    );
+}
+
+function SystemUpdateContent() {
+    return (
+        <PanelSection title="System Update">
+            <PanelSectionRow>
+                <ColorPicker label="Color" settingKey="sysupdate_color" defaultValue="#0000ff" />
+            </PanelSectionRow>
+            <PanelSectionRow>
+                <AnimationPicker label="Animation" settingKey="sysupdate_anim" defaultAnim="Pulse" />
+            </PanelSectionRow>
+        </PanelSection>
+    );
+}
+
+const pushDownloadProgress = callable<[state: string, percent: number | null, debug_payload: string], boolean>("push_download_progress");
 
 let downloadOverviewRegistration: any = null;
+let lastState = "IDLE";
+let lastPercent = 0.0;
 
 const startDownloadListener = () => {
     try {
@@ -58,37 +100,46 @@ const startDownloadListener = () => {
                 
                 let active = null;
                 if (overview) {
-                    if (overview.overall_percent_complete !== undefined && overview.update_state && overview.update_state !== "None") {
-                        if (overview.update_state === "Complete") {
-                            pushDownloadProgress(null, debugPayload);
-                            return;
-                        }
-                        const percent = overview.overall_percent_complete / 100.0;
-                        pushDownloadProgress(percent, debugPayload);
+                    const percent = (overview.overall_percent_complete !== undefined) ? overview.overall_percent_complete / 100.0 : null;
+                    if (percent !== null) {
+                        lastPercent = percent;
+                    }
+                    
+                    if (overview.paused || overview.update_state === "Paused" || overview.update_state === "Suspended") {
+                        lastState = "PAUSED";
+                        pushDownloadProgress("PAUSED", percent, debugPayload);
                         return;
                     }
                     
-                    // Fallback to older Steam payload structures just in case
-                    if (overview.active_downloads && overview.active_downloads.length > 0) {
-                        active = overview.active_downloads[0];
-                    } else if (overview.update_network_bytes_total > 0) {
-                         const percent = overview.update_network_bytes_downloaded / overview.update_network_bytes_total;
-                         pushDownloadProgress(percent, debugPayload);
-                         return;
-                    }
-
-                    if (active && active.bytes_downloaded !== undefined && active.bytes_total !== undefined && active.bytes_total > 0) {
-                        const percent = active.bytes_downloaded / active.bytes_total;
-                        pushDownloadProgress(percent, debugPayload);
-                        return;
+                    if (overview.update_state) {
+                        if (overview.update_state === "Complete" || overview.update_state === "Completed") {
+                            lastState = "COMPLETE";
+                            pushDownloadProgress("COMPLETE", percent, debugPayload);
+                            return;
+                        } else if (overview.update_state === "Failed") {
+                            lastState = "FAILED";
+                            pushDownloadProgress("FAILED", percent, debugPayload);
+                            return;
+                        } else if (overview.update_state !== "None") {
+                            lastState = "DOWNLOADING";
+                            pushDownloadProgress("DOWNLOADING", percent, debugPayload);
+                            return;
+                        }
                     }
                 }
                 
-                // Fallthrough if we got an overview but didn't match the heuristics
-                pushDownloadProgress(null, debugPayload);
+                if (lastState === "DOWNLOADING" && lastPercent >= 0.99) {
+                    lastState = "COMPLETE";
+                    pushDownloadProgress("COMPLETE", 1.0, debugPayload);
+                    return;
+                }
+                
+                // Fallthrough
+                lastState = "IDLE";
+                pushDownloadProgress("IDLE", 0, debugPayload);
             });
         } else {
-            pushDownloadProgress(null, "RegisterForDownloadOverview is missing");
+            pushDownloadProgress("IDLE", null, "RegisterForDownloadOverview is missing");
         }
     } catch (e) {
         console.error("Error registering for downloads", e);
@@ -106,6 +157,9 @@ export default definePlugin((serverApi: any) => {
             <>
                 <Content />
                 <ColorsContent />
+                <StatusContent />
+                <ErrorContent />
+                <SystemUpdateContent />
             </>
         ),
         icon: <FaMemory />,
@@ -113,7 +167,7 @@ export default definePlugin((serverApi: any) => {
             if (downloadOverviewRegistration && typeof downloadOverviewRegistration.unregister === 'function') {
                 downloadOverviewRegistration.unregister();
             }
-            pushDownloadProgress(null, "Plugin dismounted");
+            pushDownloadProgress("IDLE", null, "Plugin dismounted");
             console.log("Deck RGB Sync unmounted");
         },
     };

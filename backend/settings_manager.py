@@ -30,3 +30,18 @@ class SettingsManager:
     def setSetting(self, key, value):
         self.settings[key] = value
         self._save()
+
+    def getDeviceSetting(self, device_name, key, default=None):
+        device_settings = self.settings.get("device_settings", {})
+        if device_name in device_settings:
+            return device_settings[device_name].get(key, default)
+        return default
+        
+    def setDeviceSetting(self, device_name, key, value):
+        if "device_settings" not in self.settings:
+            self.settings["device_settings"] = {}
+        if device_name not in self.settings["device_settings"]:
+            self.settings["device_settings"][device_name] = {}
+            
+        self.settings["device_settings"][device_name][key] = value
+        self._save()

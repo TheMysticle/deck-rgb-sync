@@ -85,7 +85,7 @@ class RGBController:
             return RGBColor(r, g, b)
         return RGBColor(0, 0, 0)
 
-    def set_solid_color(self, enabled_devices: list, hex_color: str):
+    def set_solid_color(self, enabled_devices: list, hex_color: str, device_settings: dict = None):
         if not self.connected or not self.client:
             return
             
@@ -100,9 +100,12 @@ class RGBController:
             decky.logger.error(f"Error setting solid color: {e}")
             self.connected = False
 
-    def set_zone_fill(self, enabled_devices: list, percent: float, fill_hex: str, bg_hex: str = "#000000"):
+    def set_zone_fill(self, enabled_devices: list, percent: float, fill_hex: str, bg_hex: str = "#000000", device_settings: dict = None):
         if not self.connected or not self.client:
             return
+            
+        if device_settings is None:
+            device_settings = {}
             
         try:
             fill_color = self.hex_to_rgb(fill_hex)
@@ -110,6 +113,8 @@ class RGBController:
 
             for device in self.client.devices:
                 if device.name in enabled_devices:
+                    reverse = device_settings.get(device.name, {}).get("reverse", False)
+                    
                     for zone in device.zones:
                         num_leds = len(zone.leds)
                         if num_leds == 0:
@@ -122,6 +127,9 @@ class RGBController:
                                 colors.append(fill_color)
                             else:
                                 colors.append(bg_color)
+                                
+                        if reverse:
+                            colors.reverse()
                         
                         zone.set_colors(colors, fast=True)
         except Exception as e:
