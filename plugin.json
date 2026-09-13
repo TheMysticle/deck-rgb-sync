@@ -1,0 +1,11 @@
+{
+  "name": "Deck RGB Sync",
+  "author": "mysticle",
+  "flags": ["debug", "_root"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["rgb", "openrgb", "root"],
+    "description": "Drives OpenRGB from system state (RAM, Downloads).",
+    "image": "https://opengraph.githubassets.com/1/mysticle/deck-rgb-sync"
+  }
+}
